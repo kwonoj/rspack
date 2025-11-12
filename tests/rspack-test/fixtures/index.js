@@ -1,0 +1,1 @@
+import img from "./test.png"; export default img;

@@ -11,7 +11,7 @@ use rspack_core::{
   DependencyType, Filename, GenerateContext, GeneratorOptions, Module, ModuleGraph,
   NAMESPACE_OBJECT_EXPORT, NormalModule, ParseContext, ParserAndGenerator, PathData, Plugin,
   PublicPath, RenderManifestEntry, ResourceData, RuntimeGlobals, RuntimeSpec, SourceType,
-  rspack_sources::{BoxSource, RawStringSource, SourceExt},
+  rspack_sources::{BoxSource, RawStringSource, SourceExt, SourceValue},
 };
 use rspack_error::{
   Diagnostic, IntoTWithDiagnosticArray, Result, ToStringResultToRspackResultExt, error,
@@ -629,7 +629,23 @@ impl ParserAndGenerator for AssetParserAndGenerator {
 
           asset_path
         } else if parsed_asset_config.is_source() {
-          format!(r"{:?}", source.source().into_string_lossy())
+          // For asset/source, inline the content as a string
+          match source.source() {
+            SourceValue::String(s) => format!(r"{:?}", s),
+            SourceValue::Buffer(b) => {
+              // For binary data, try to convert to UTF-8 string first
+              match String::from_utf8(b.to_vec()) {
+                Ok(s) => format!(r"{:?}", s),
+                Err(_) => {
+                  // Binary data - encode as base64
+                  format!(
+                    r#""data:application/octet-stream;base64,{}""#,
+                    base64::encode_to_string(b)
+                  )
+                }
+              }
+            }
+          }
         } else {
           unreachable!()
         };
